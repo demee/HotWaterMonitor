@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="theme-color" content="#172b41">
+    <title>Hot Water Monitor</title>
+    <style>
+        :root {
+            font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+            color: #20364d;
+            background: #f0f5f8
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0
+        }
+
+        .bar {
+            background: #172b41;
+            color: #f5f8fc;
+            padding: 14px max(20px, calc((100% - 920px)/2));
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            box-shadow: 0 2px 8px #14273a35
+        }
+
+        .bar svg {
+            width: 39px;
+            height: 45px;
+            flex: none
+        }
+
+        .bar h1 {
+            font-size: clamp(1.3rem, 4vw, 2rem);
+            margin: 0;
+            font-weight: 650;
+            letter-spacing: .01em
+        }
+
+        .wrap {
+            width: min(920px, 100% - 28px);
+            margin: 24px auto
+        }
+
+        .card {
+            background: #fff;
+            border: 1px solid #e2ebf1;
+            border-radius: 20px;
+            padding: clamp(16px, 4vw, 30px);
+            box-shadow: 0 8px 28px #19334a0b
+        }
+
+        .card h2 {
+            font-size: 1.35rem;
+            margin: 0 0 8px
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #52677b;
+            font-size: .9rem;
+            margin-bottom: 16px
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #8796a4
+        }
+
+        .dot.ok {
+            background: #16a36a;
+            box-shadow: 0 0 0 3px #16a36a22
+        }
+
+        .dot.bad {
+            background: #d14b45
+        }
+
+        .diagram {
+            display: block;
+            width: min(100%, 580px);
+            height: auto;
+            margin: 0 auto
+        }
+
+        .sensor {
+            fill: #fff;
+            stroke-width: 3
+        }
+
+        .readout {
+            font: 700 25px system-ui, -apple-system, "Segoe UI", sans-serif
+        }
+
+        .label {
+            font: 16px system-ui, -apple-system, "Segoe UI", sans-serif;
+            fill: #43596e
+        }
+
+        .pipe-label {
+            font: 15px system-ui, -apple-system, "Segoe UI", sans-serif;
+            fill: #43596e
+        }
+
+        .foot {
+            border-top: 1px solid #e8eef2;
+            margin-top: 12px;
+            padding-top: 14px;
+            color: #63778a;
+            font-size: .87rem;
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap
+        }
+
+        .settings {
+            margin-top: 20px;
+            color: #586d80;
+            font-size: .85rem
+        }
+
+        .settings summary {
+            cursor: pointer
+        }
+
+        .settings form {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            flex-wrap: wrap
+        }
+
+        .settings input {
+            flex: 1;
+            min-width: 190px;
+            padding: 9px 11px;
+            border: 1px solid #cad6df;
+            border-radius: 8px;
+            font: inherit
+        }
+
+        .settings button {
+            padding: 9px 14px;
+            border: 0;
+            border-radius: 8px;
+            background: #1d5ac7;
+            color: white;
+            font: inherit;
+            cursor: pointer
+        }
+
+        .hint {
+            margin: 7px 0 0
+        }
+
+        @media(max-width:540px) {
+            .wrap {
+                width: calc(100% - 18px);
+                margin: 12px auto
+            }
+
+            .card {
+                padding: 14px 10px
+            }
+
+            .diagram {
+                width: 100%
+            }
+
+            .foot {
+                font-size: .8rem
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="bar"><svg viewBox="0 0 40 48" role="img" aria-label="Water drop">
+            <path d="M20 2C15 12 4 23 4 32a16 16 0 0 0 32 0C36 23 25 12 20 2Z" fill="#58a9f2" />
+            <path d="M12 33c0 4 3 8 7 9" fill="none" stroke="#1672c7" stroke-width="2" stroke-linecap="round" />
+        </svg>
+        <h1>Hot Water Monitor</h1>
+    </header>
+    <main class="wrap">
+        <section class="card" aria-labelledby="tank-title">
+            <h2 id="tank-title">Tank</h2>
+            <div class="status" role="status" aria-live="polite"><span class="dot" id="dot"></span><span
+                    id="state">Connecting to ESP32…</span></div>
+            <svg class="diagram" viewBox="0 0 520 660" role="img" aria-labelledby="diagram-title diagram-desc">
+                <title id="diagram-title">Hot water tank and live sensor readings</title>
+                <desc id="diagram-desc">Cutaway tank with hot water above cool water, an outlet at the top, and a feed
+                    at the bottom.</desc>
+                <defs>
+                    <linearGradient id="water" x2="0" y2="1">
+                        <stop stop-color="#f04b36" offset="0" />
+                        <stop stop-color="#ff7644" offset=".35" />
+                        <stop stop-color="#4bbbe9" offset=".61" />
+                        <stop stop-color="#1267df" offset="1" />
+                    </linearGradient>
+                    <linearGradient id="steel" x2="1">
+                        <stop stop-color="#d9e0e5" />
+                        <stop offset=".5" stop-color="#f6f8f9" />
+                        <stop offset="1" stop-color="#d0d9df" />
+                    </linearGradient>
+                </defs>
+                <!-- pipes -->
+                <path d="M213 144v-35q0-31 31-31h104" fill="none" stroke="#762f29" stroke-width="25"
+                    stroke-linejoin="round" />
+                <path d="M213 144v-35q0-31 31-31h104" fill="none" stroke="#ed6548" stroke-width="15"
+                    stroke-linejoin="round" />
+                <path d="M194 476v102q0 28-28 28H90" fill="none" stroke="#23658f" stroke-width="23"
+                    stroke-linejoin="round" />
+                <path d="M194 476v102q0 28-28 28H90" fill="none" stroke="#24b8e5" stroke-width="13"
+                    stroke-linejoin="round" />
+                <!-- vessel -->
+                <path d="M105 178Q105 137 154 128Q194 121 235 128Q284 137 284 178v275q0 44-45 54-41 8-89 0-45-10-45-54Z"
+                    fill="url(#steel)" stroke="#566573" stroke-width="5" />
+                <path d="M119 188q0-22 31-27 43-6 88 0 31 5 31 27v261q0 23-27 30-45 10-96 0-27-7-27-30Z"
+                    fill="url(#water)" />
+                <path d="M119 188q0-22 31-27 43-6 88 0 31 5 31 27" fill="none" stroke="#ff7350" stroke-width="4" />
+                <path d="M140 482v29h16l7-26m71 0 7 26h16v-29" fill="#d6dee3" stroke="#566573" stroke-width="4"
+                    stroke-linejoin="round" />
+                <!-- sensor markers -->
+                <circle cx="273" cy="183" r="14" class="sensor" stroke="#ed302b" />
+                <path d="M287 183h43" stroke="#ed302b" stroke-width="4" />
+                <circle cx="273" cy="449" r="14" class="sensor" stroke="#1267df" />
+                <path d="M287 449h43" stroke="#1267df" stroke-width="4" />
+                <!-- annotations --> <text x="352" y="61" class="pipe-label">To house</text><text x="352" y="82"
+                    class="pipe-label">(hot water out)</text><text x="340" y="181" id="top-temp" class="readout"
+                    fill="#e72f2c">--.-°C</text><text x="340" y="208" class="label">Top sensor · Outlet</text><text
+                    x="340" y="229" class="label">temp2C</text><text x="340" y="446" id="bottom-temp" class="readout"
+                    fill="#1267df">--.-°C</text><text x="340" y="473" class="label">Bottom sensor · Feed</text><text
+                    x="340" y="494" class="label">temp1C</text><text x="220" y="624" class="pipe-label">From
+                    heater</text><text x="220" y="645" class="pipe-label">(cold feed)</text>
+                <path d="M190 611h-39m0 0 9-8m-9 8 9 8" fill="none" stroke="#159ce3" stroke-width="4"
+                    stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="foot"><span id="last">No reading received yet</span><span>Refreshes every 3 seconds</span></div>
+            <details class="settings">
+                <summary>API connection settings</summary>
+                <form id="config"><input id="base" type="url" placeholder="API base URL (blank = same host)"
+                        aria-label="ESP32 API base URL"><button type="submit">Save</button></form>
+                <p class="hint">For same-origin access, serve this page from the ESP32 and leave the base blank.
+                    Browsers block pages opened as file:// from reading the ESP32 API unless its firmware enables CORS.
+                    A separate web host also needs CORS enabled on the ESP32 API.</p>
+            </details>
+        </section>
+    </main>
+    <script>
+        'use strict';
+        const $ = id => document.getElementById(id), state = $('state'), dot = $('dot'), topOut = $('top-temp'), bottomOut = $('bottom-temp'), last = $('last'), base = $('base');
+        base.value = localStorage.getItem('hotWaterApiBase') || 'http://192.168.1.194';
+        function endpoint() { const b = base.value.trim().replace(/\/+$/, ''); return b ? b + '/api/temp' : '/api/temp' }
+        async function refresh() { try { const r = await fetch(endpoint(), { cache: 'no-store', signal: AbortSignal.timeout(5000) }); if (!r.ok) throw Error('HTTP ' + r.status); const d = await r.json(); if (!Number.isFinite(d.temp1C) || !Number.isFinite(d.temp2C)) throw Error('Unexpected response'); bottomOut.textContent = d.temp1C.toFixed(1) + '°C'; topOut.textContent = d.temp2C.toFixed(1) + '°C'; dot.className = 'dot ok'; state.textContent = 'ESP32 reachable'; last.dataset.when = new Date().toLocaleTimeString(); last.textContent = 'Last reading: ' + last.dataset.when } catch (e) { dot.className = 'dot bad'; state.textContent = e.message === 'Unexpected response' ? 'Invalid sensor data' : e.name === 'TypeError' ? 'CORS blocked · serve this page from the ESP32' : 'ESP32 unreachable · waiting to reconnect'; last.textContent = 'Last successful reading: ' + (last.dataset.when || 'none yet') } }
+        document.getElementById('config').addEventListener('submit', e => { e.preventDefault(); localStorage.setItem('hotWaterApiBase', base.value.trim().replace(/\/+$/, '')); refresh() });
+        refresh(); setInterval(refresh, 3000);
+    </script>
+</body>
+
+</html>
