@@ -9,6 +9,7 @@ The firmware publishes JSON endpoints, and the browser UI visualizes top and bot
 - Framework: Arduino (`framework = arduino`)
 - Filesystem: SPIFFS (`board_build.filesystem = spiffs`)
 - Libraries: `OneWire`, `DallasTemperature`, `ArduinoJson`
+- Sensors: two DS18B20 on a shared OneWire bus on `GPIO4`
 
 ## Build and flash
 Run from the repository root:
@@ -34,13 +35,18 @@ Then edit `src/local_env.h` and set `WIFI_SSID` / `WIFI_PASS`.
 `src/local_env.h` is ignored by git, so secrets stay local.
 
 ## API
-- `GET /` returns `{"status": "ok"}`.
+- `GET /` serves `index.html` from SPIFFS, or returns `404 index.html not found` if the filesystem image has not been uploaded.
 - `GET /api/status` returns static JSON fields `top_c`, `bottom_c`, `heating_pump`, `hot_water_flow`.
-- `GET /api/temp` returns JSON generated from DS18B20 readings with keys `tempCold` and `tempHot`.
+- `GET /api/temp` returns live DS18B20 readings in °C with keys `tempBottom` (sensor index 0) and `tempTop` (sensor index 1), for example:
+
+```json
+{"tempBottom":38.1,"tempTop":52.3}
+```
 
 ## Web UI
-`data/index.html` polls `/api/temp` every 3 seconds to update top and bottom tank temperature display values.
-The page currently reads response fields named `temp1C` (bottom) and `temp2C` (top).
+Open `http://<device-ip>/` to load `data/index.html` from the ESP32.
+The page polls `/api/temp` on the same host every 10 seconds and shows `tempTop` and `tempBottom` on the tank diagram.
+The firmware sends no CORS headers, so the page only works when served by the ESP32. Opening it from `file://` or another host fails.
 
 ## Project layout
 - `src/main.cpp` - firmware setup, Wi-Fi bootstrapping, HTTP handlers, sensor reads.

@@ -125,46 +125,6 @@
             flex-wrap: wrap
         }
 
-        .settings {
-            margin-top: 20px;
-            color: #586d80;
-            font-size: .85rem
-        }
-
-        .settings summary {
-            cursor: pointer
-        }
-
-        .settings form {
-            display: flex;
-            gap: 8px;
-            margin-top: 10px;
-            flex-wrap: wrap
-        }
-
-        .settings input {
-            flex: 1;
-            min-width: 190px;
-            padding: 9px 11px;
-            border: 1px solid #cad6df;
-            border-radius: 8px;
-            font: inherit
-        }
-
-        .settings button {
-            padding: 9px 14px;
-            border: 0;
-            border-radius: 8px;
-            background: #1d5ac7;
-            color: white;
-            font: inherit;
-            cursor: pointer
-        }
-
-        .hint {
-            margin: 7px 0 0
-        }
-
         @media(max-width:540px) {
             .wrap {
                 width: calc(100% - 18px);
@@ -237,35 +197,23 @@
                 <path d="M287 183h43" stroke="#ed302b" stroke-width="4" />
                 <circle cx="273" cy="449" r="14" class="sensor" stroke="#1267df" />
                 <path d="M287 449h43" stroke="#1267df" stroke-width="4" />
-                <!-- annotations --> <text x="352" y="61" class="pipe-label">To house</text><text x="352" y="82"
-                    class="pipe-label">(hot water out)</text><text x="340" y="181" id="top-temp" class="readout"
-                    fill="#e72f2c">--.-°C</text><text x="340" y="208" class="label">Top sensor · Outlet</text><text
-                    x="340" y="229" class="label">temp2C</text><text x="340" y="446" id="bottom-temp" class="readout"
-                    fill="#1267df">--.-°C</text><text x="340" y="473" class="label">Bottom sensor · Feed</text><text
-                    x="340" y="494" class="label">temp1C</text><text x="220" y="624" class="pipe-label">From
-                    heater</text><text x="220" y="645" class="pipe-label">(cold feed)</text>
-                <path d="M190 611h-39m0 0 9-8m-9 8 9 8" fill="none" stroke="#159ce3" stroke-width="4"
-                    stroke-linecap="round" stroke-linejoin="round" />
+                <!-- annotations --> 
+                    <text x="352" y="61" class="pipe-label">To shower</text>
+                    <text x="340" y="181" id="top-temp" class="readout" fill="#e72f2c">--.-°C</text>
+                    <text x="340" y="208" class="label">Outlet Temperature</text>
+                    <text x="340" y="229" class="label">tempTop</text>
+                    <text x="340" y="446" id="bottom-temp" class="readout" fill="#1267df">--.-°C</text>
+                    <text x="340" y="473" class="label">Feed Temperature</text>
+                    <text x="220" y="624" class="pipe-label">Cold Feed</text>
             </svg>
-            <div class="foot"><span id="last">No reading received yet</span><span>Refreshes every 3 seconds</span></div>
-            <details class="settings">
-                <summary>API connection settings</summary>
-                <form id="config"><input id="base" type="url" placeholder="API base URL (blank = same host)"
-                        aria-label="ESP32 API base URL"><button type="submit">Save</button></form>
-                <p class="hint">For same-origin access, serve this page from the ESP32 and leave the base blank.
-                    Browsers block pages opened as file:// from reading the ESP32 API unless its firmware enables CORS.
-                    A separate web host also needs CORS enabled on the ESP32 API.</p>
-            </details>
+            <div class="foot"><span id="last">No reading received yet</span></div>
         </section>
     </main>
     <script>
         'use strict';
-        const $ = id => document.getElementById(id), state = $('state'), dot = $('dot'), topOut = $('top-temp'), bottomOut = $('bottom-temp'), last = $('last'), base = $('base');
-        base.value = localStorage.getItem('hotWaterApiBase') || 'http://192.168.1.194';
-        function endpoint() { const b = base.value.trim().replace(/\/+$/, ''); return b ? b + '/api/temp' : '/api/temp' }
-        async function refresh() { try { const r = await fetch(endpoint(), { cache: 'no-store', signal: AbortSignal.timeout(5000) }); if (!r.ok) throw Error('HTTP ' + r.status); const d = await r.json(); if (!Number.isFinite(d.temp1C) || !Number.isFinite(d.temp2C)) throw Error('Unexpected response'); bottomOut.textContent = d.temp1C.toFixed(1) + '°C'; topOut.textContent = d.temp2C.toFixed(1) + '°C'; dot.className = 'dot ok'; state.textContent = 'ESP32 reachable'; last.dataset.when = new Date().toLocaleTimeString(); last.textContent = 'Last reading: ' + last.dataset.when } catch (e) { dot.className = 'dot bad'; state.textContent = e.message === 'Unexpected response' ? 'Invalid sensor data' : e.name === 'TypeError' ? 'CORS blocked · serve this page from the ESP32' : 'ESP32 unreachable · waiting to reconnect'; last.textContent = 'Last successful reading: ' + (last.dataset.when || 'none yet') } }
-        document.getElementById('config').addEventListener('submit', e => { e.preventDefault(); localStorage.setItem('hotWaterApiBase', base.value.trim().replace(/\/+$/, '')); refresh() });
-        refresh(); setInterval(refresh, 3000);
+        const $ = id => document.getElementById(id), state = $('state'), dot = $('dot'), topOut = $('top-temp'), bottomOut = $('bottom-temp'), last = $('last');
+        async function refresh() { try { const r = await fetch('/api/temp', { cache: 'no-store', signal: AbortSignal.timeout(5000) }); if (!r.ok) throw Error('HTTP ' + r.status); const d = await r.json(); if (!Number.isFinite(d.tempTop) || !Number.isFinite(d.tempBottom)) throw Error('Unexpected response'); bottomOut.textContent = d.tempBottom.toFixed(1) + '°C'; topOut.textContent = d.tempTop.toFixed(1) + '°C'; dot.className = 'dot ok'; state.textContent = 'ESP32 reachable'; last.dataset.when = new Date().toLocaleTimeString(); last.textContent = 'Last reading: ' + last.dataset.when } catch (e) { dot.className = 'dot bad'; state.textContent = e.message === 'Unexpected response' ? 'Invalid sensor data' : 'ESP32 unreachable · waiting to reconnect'; last.textContent = 'Last successful reading: ' + (last.dataset.when || 'none yet') } }
+        refresh(); setInterval(refresh, 10000);
     </script>
 </body>
 

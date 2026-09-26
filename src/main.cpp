@@ -17,9 +17,6 @@ DallasTemperature sensors(&oneWire);
 
 void WiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
   Serial.printf("[WiFi-event] event: %d\n", event);
-  Serial.println();
-  Serial.printf("[WiFi-event-info]: event %d", info);
-  Serial.println();
 
   switch (event) {
     case ARDUINO_EVENT_WIFI_READY:               Serial.println("WiFi interface ready"); break;
@@ -27,7 +24,9 @@ void WiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
     case ARDUINO_EVENT_WIFI_STA_START:           Serial.println("WiFi client started"); break;
     case ARDUINO_EVENT_WIFI_STA_STOP:            Serial.println("WiFi clients stopped"); break;
     case ARDUINO_EVENT_WIFI_STA_CONNECTED:       Serial.println("Connected to access point"); break;
-    case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:    Serial.println("Disconnected from WiFi access point"); break;
+    case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+      Serial.printf("Disconnected from WiFi access point, reason: %d\n", info.wifi_sta_disconnected.reason);
+      break;
     case ARDUINO_EVENT_WIFI_STA_AUTHMODE_CHANGE: Serial.println("Authentication mode of access point has changed"); break;
     case ARDUINO_EVENT_WIFI_STA_GOT_IP:
       Serial.print("Obtained IP address: ");
@@ -100,7 +99,13 @@ void scanWiFi() {
 
 
 void handleRoot() {
-  server.send(200, "application/json", "{\"status\": \"ok\"}");
+  File file = SPIFFS.open("/index.html", "r");
+  if (!file) {
+    server.send(404, "text/plain", "index.html not found");
+    return;
+  }
+  server.streamFile(file, "text/html");
+  file.close();
 }
 
 
@@ -116,13 +121,13 @@ void handleStatus() {
 void handleTemperature() {
   sensors.requestTemperatures();
 
-  float tempCold = sensors.getTempCByIndex(0);
-  float tempHot = sensors.getTempCByIndex(1);
+  float tempBottom = sensors.getTempCByIndex(0);
+  float tempTop = sensors.getTempCByIndex(1);
 
   JsonDocument doc;
 
-  doc["tempCold"] = tempCold; 
-  doc["tempHot"] = tempHot;
+  doc["tempBottom"] = tempBottom;
+  doc["tempTop"] = tempTop;
 
 
   String content;
