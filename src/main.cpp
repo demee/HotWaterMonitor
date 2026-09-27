@@ -58,12 +58,56 @@ void WiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
 void connectToWiFi() {
   WiFi.onEvent(WiFiEvent);
   WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
+  WiFi.setSleep(false);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
 
   Serial.print("Connecting...");
 
   Serial.println();
   Serial.println(WiFi.localIP());
+}
+
+const unsigned long WIFI_CHECK_INTERVAL_MS = 10000;
+const unsigned long WIFI_RECONNECT_INTERVAL_MS = 30000;
+const unsigned long WIFI_REBOOT_AFTER_MS = 300000;
+
+unsigned long lastWiFiCheck = 0;
+unsigned long wifiLostSince = 0;
+unsigned long lastReconnectAttempt = 0;
+
+void maintainWiFi() {
+  unsigned long now = millis();
+  if (now - lastWiFiCheck < WIFI_CHECK_INTERVAL_MS) return;
+  lastWiFiCheck = now;
+
+  if (WiFi.status() == WL_CONNECTED) {
+    if (wifiLostSince != 0) {
+      Serial.println("WiFi connection restored");
+      wifiLostSince = 0;
+    }
+    return;
+  }
+
+  if (wifiLostSince == 0) {
+    wifiLostSince = now;
+    lastReconnectAttempt = now;
+    Serial.printf("WiFi connection lost (status %d)\n", WiFi.status());
+    return;
+  }
+
+  if (now - wifiLostSince >= WIFI_REBOOT_AFTER_MS) {
+    Serial.println("WiFi down for 5 minutes, restarting");
+    delay(100);
+    ESP.restart();
+  }
+
+  if (now - lastReconnectAttempt >= WIFI_RECONNECT_INTERVAL_MS) {
+    lastReconnectAttempt = now;
+    Serial.printf("Reconnecting to WiFi (status %d)...\n", WiFi.status());
+    WiFi.disconnect();
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+  }
 }
 
 
@@ -192,6 +236,7 @@ void setup() {
 // Main loop
 
 void loop() {
+  maintainWiFi();
   server.handleClient();
   delay(10);
 }

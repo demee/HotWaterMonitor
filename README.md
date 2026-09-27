@@ -34,6 +34,9 @@ Copy-Item .\src\local_env.example.h .\src\local_env.h
 Then edit `src/local_env.h` and set `WIFI_SSID` / `WIFI_PASS`.
 `src/local_env.h` is ignored by git, so secrets stay local.
 
+## Wi-Fi reconnect
+Modem power-save is disabled (`WiFi.setSleep(false)`). `maintainWiFi()` in `loop()` checks the connection every 10 s; once it is lost it forces `WiFi.disconnect()` + `WiFi.begin()` every 30 s and calls `ESP.restart()` after 5 minutes offline. Tune via `WIFI_CHECK_INTERVAL_MS`, `WIFI_RECONNECT_INTERVAL_MS`, `WIFI_REBOOT_AFTER_MS` in `src/main.cpp`.
+
 ## API
 - `GET /` serves `index.html` from SPIFFS, or returns `404 index.html not found` if the filesystem image has not been uploaded.
 - `GET /api/status` returns static JSON fields `top_c`, `bottom_c`, `heating_pump`, `hot_water_flow`.
