@@ -35,7 +35,7 @@ Then edit `src/local_env.h` and set `WIFI_SSID` / `WIFI_PASS`.
 `src/local_env.h` is ignored by git, so secrets stay local.
 
 ## Wi-Fi reconnect
-Modem power-save is disabled (`WiFi.setSleep(false)`). `maintainWiFi()` in `loop()` checks the connection every 10 s; once it is lost it forces `WiFi.disconnect()` + `WiFi.begin()` every 30 s and calls `ESP.restart()` after 5 minutes offline. Tune via `WIFI_CHECK_INTERVAL_MS`, `WIFI_RECONNECT_INTERVAL_MS`, `WIFI_REBOOT_AFTER_MS` in `src/main.cpp`.
+Modem power-save is disabled (`WiFi.setSleep(false)`). `wifiLoop()` in `loop()` checks the connection every 10 s; once it is lost it forces `WiFi.disconnect()` + `WiFi.begin()` every 30 s and calls `ESP.restart()` after 5 minutes offline. Tune via `WIFI_CHECK_INTERVAL_MS`, `WIFI_RECONNECT_INTERVAL_MS`, `WIFI_REBOOT_AFTER_MS` in `src/wifi_connection.cpp`.
 
 ## API
 - `GET /` serves `index.html` from SPIFFS, or returns `404 index.html not found` if the filesystem image has not been uploaded.
@@ -52,7 +52,12 @@ The page polls `/api/temp` on the same host every 10 seconds and shows `tempTop`
 The firmware sends no CORS headers, so the page only works when served by the ESP32. Opening it from `file://` or another host fails.
 
 ## Project layout
-- `src/main.cpp` - firmware setup, Wi-Fi bootstrapping, HTTP handlers, sensor reads.
+- `src/main.cpp` - `setup()`/`loop()` that only wire the modules below together.
+- `src/wifi_connection.*` - Wi-Fi scan, connect, event logging, reconnect/reboot watchdog.
+- `src/spiffs_storage.*` - SPIFFS mount.
+- `src/temperature_sensors.*` - DS18B20 bus on `GPIO4`, `readTankTemperatures()`.
+- `src/web_server.*` - HTTP routes and handlers.
+- `src/shower_detector.cpp` - commented-out shower detection draft (not compiled).
 - `data/index.html` - single-page UI that fetches and renders live temperature values.
 - `platformio.ini` - PlatformIO environment, board, filesystem, and library dependencies.
 - `partitions.csv` - flash partition map used by the ESP32 build.
