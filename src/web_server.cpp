@@ -4,6 +4,7 @@
 #include <SPIFFS.h>
 #include <ArduinoJson.h>
 #include "logger.h"
+#include "temperature_history.h"
 #include "temperature_sensors.h"
 
 static WebServer server(80);
@@ -56,11 +57,32 @@ static void handleLog() {
   file.close();
 }
 
+static void handleHistory() {
+  String day = server.arg("day");
+  bool valid = day.length() == 8;
+  for (size_t i = 0; valid && i < day.length(); i++) {
+    valid = isDigit(day[i]);
+  }
+  if (!valid) {
+    server.send(400, "text/plain", "day must be YYYYMMDD");
+    return;
+  }
+
+  File file = historyOpenDay(day.c_str());
+  if (!file) {
+    server.send(404, "text/plain", "history not found");
+    return;
+  }
+  server.streamFile(file, "application/octet-stream");
+  file.close();
+}
+
 void webServerSetup() {
   server.on("/", HTTP_GET, handleRoot);
   server.on("/api/status", HTTP_GET, handleStatus);
   server.on("/api/temp", HTTP_GET, handleTemperature);
   server.on("/api/log", HTTP_GET, handleLog);
+  server.on("/api/history", HTTP_GET, handleHistory);
   server.begin();
 }
 

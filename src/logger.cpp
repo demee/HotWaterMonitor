@@ -10,7 +10,6 @@ static const char* LOG_BASE_PATH = "/logs";
 static const char* LOG_PATH = "/log.txt";
 static const char* LOG_ROTATED_PATH = "/log.old.txt";
 static const size_t LOG_MAX_BYTES = 100 * 1024;
-static const time_t MIN_VALID_EPOCH = 1704067200; // 2024-01-01, anything earlier means NTP not synced yet
 
 const char* const LOG_TIMEZONE = "CET-1CEST,M3.5.0,M10.5.0/3";
 

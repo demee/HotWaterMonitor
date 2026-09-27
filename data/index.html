@@ -101,6 +101,59 @@
             padding: 12px
         }
 
+        .seg {
+            display: flex;
+            margin: 4px 0 10px;
+            border: 1px solid #c9d8e3;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #fff
+        }
+
+        .seg button {
+            flex: 1;
+            min-height: 40px;
+            border: 0;
+            background: none;
+            color: #20364d;
+            font: 600 .85rem system-ui, -apple-system, "Segoe UI", sans-serif;
+            cursor: pointer
+        }
+
+        .seg button+button {
+            border-left: 1px solid #c9d8e3
+        }
+
+        .seg button.active {
+            background: #58a9f2;
+            color: #fff
+        }
+
+        #hist-chart {
+            display: block;
+            width: 100%;
+            height: 240px
+        }
+
+        .hist-legend {
+            display: flex;
+            gap: 16px;
+            font-size: .85rem;
+            color: #52677b;
+            margin-top: 8px
+        }
+
+        .hist-legend span::before {
+            content: "";
+            display: inline-block;
+            width: 12px;
+            height: 3px;
+            border-radius: 2px;
+            margin-right: 6px;
+            vertical-align: middle;
+            background: currentColor
+        }
+
         .bar {
             background: #172b41;
             color: #f5f8fc;
@@ -289,6 +342,22 @@
             <div class="foot"><span id="last">No reading received yet</span></div>
         </section>
         </div>
+        <div id="view-history" class="view" hidden>
+            <section class="card" aria-labelledby="history-title">
+                <h2 id="history-title">Temperatures and Activity</h2>
+                <div class="seg" role="group" aria-label="Time range">
+                    <button type="button" data-range="3600">1h</button>
+                    <button type="button" data-range="21600">6h</button>
+                    <button type="button" data-range="86400">24h</button>
+                    <button type="button" data-range="604800">7d</button>
+                    <button type="button" data-range="2592000">30d</button>
+                </div>
+                <div id="hist-state" class="log-tools" role="status" aria-live="polite">Not loaded</div>
+                <div id="hist-wrap"><svg id="hist-chart" role="img" aria-label="Temperature history chart"></svg></div>
+                <div class="hist-legend"><span style="color:#e72f2c">Outlet (top)</span><span
+                        style="color:#1267df">Feed (bottom)</span></div>
+            </section>
+        </div>
         <div id="view-logs" class="view" hidden>
             <section class="card" aria-labelledby="logs-title">
                 <h2 id="logs-title">Logs</h2>
@@ -302,6 +371,10 @@
         <button type="button" role="tab" data-view="tank"><svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M12 2C9 7 5 11 5 15a7 7 0 0 0 14 0c0-4-4-8-7-13Z" fill="currentColor" />
             </svg>Tank</button>
+        <button type="button" role="tab" data-view="history"><svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 3v18h18M7 15l4-5 3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2"
+                    stroke-linecap="round" stroke-linejoin="round" />
+            </svg>History</button>
         <button type="button" role="tab" data-view="logs"><svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 6h16M4 12h16M4 18h10" fill="none" stroke="currentColor" stroke-width="2.4"
                     stroke-linecap="round" />
@@ -325,15 +398,136 @@
             } catch (e) { logState.textContent = 'Could not load logs' }
             finally { logRefresh.disabled = false }
         }
+        const TREND_WINDOW = 900, TREND_MIN_SPAN = 600, HEAT_RISE = 0.8, SHOWER_DROP = 1.5, BAND_MERGE = 600, MIN_BAND = 600, MAX_POINTS = 300, MIN_LABEL_PX = 8;
+        const histState = $('hist-state'), histWrap = $('hist-wrap'), histChart = $('hist-chart'), rangeBtns = document.querySelectorAll('.seg button'), dayCache = new Map();
+        let histRange = 86400, histData = null, histLoading = false;
+        const pad2 = n => String(n).padStart(2, '0'), dayKey = d => d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate());
+        async function fetchDay(key) {
+            if (dayCache.has(key)) return dayCache.get(key);
+            const r = await fetch('/api/history?day=' + key, { cache: 'no-store', signal: AbortSignal.timeout(10000) }), out = [];
+            if (r.status !== 404) {
+                if (!r.ok) throw Error('HTTP ' + r.status);
+                const v = new DataView(await r.arrayBuffer()), dec = x => x === -32768 ? NaN : x / 100;
+                for (let o = 0; o + 8 <= v.byteLength; o += 8) out.push({ t: v.getUint32(o, true), top: dec(v.getInt16(o + 4, true)), bottom: dec(v.getInt16(o + 6, true)) });
+            }
+            if (key !== dayKey(new Date())) dayCache.set(key, out);
+            return out;
+        }
+        async function loadHistory() {
+            if (histLoading) return;
+            histLoading = true;
+            const range = histRange;
+            for (const b of rangeBtns) b.classList.toggle('active', +b.dataset.range === range);
+            try {
+                const to = Math.floor(Date.now() / 1000), from = to - range, keys = [], samples = [], d = new Date(from * 1000);
+                d.setHours(0, 0, 0, 0);
+                while (d.getTime() / 1000 <= to) { keys.push(dayKey(d)); d.setDate(d.getDate() + 1) }
+                for (const [i, key] of keys.entries()) {
+                    histState.textContent = `Loading… (${i + 1}/${keys.length})`;
+                    for (const s of await fetchDay(key)) if (s.t >= from && s.t <= to) samples.push(s);
+                }
+                histData = { from, to, samples: samples.sort((a, b) => a.t - b.t) };
+                histState.textContent = renderHistory() ? 'Updated ' + new Date().toLocaleTimeString() : 'No history recorded yet';
+            } catch (e) { histState.textContent = 'Could not load history' }
+            finally { histLoading = false }
+            if (histRange !== range) loadHistory();
+        }
+        function detectBands(samples) {
+            const pts = samples.filter(s => Number.isFinite(s.top)), raw = { heat: [], shower: [] }, bands = [];
+            for (let i = 0, j = 0; i < pts.length; i++) {
+                while (pts[j].t < pts[i].t - TREND_WINDOW) j++;
+                if (pts[i].t - pts[j].t < TREND_MIN_SPAN) continue;
+                const delta = pts[i].top - pts[j].top;
+                if (delta >= HEAT_RISE) raw.heat.push([pts[j].t, pts[i].t]);
+                else if (delta <= -SHOWER_DROP) raw.shower.push([pts[j].t, pts[i].t]);
+            }
+            for (const kind in raw) {
+                let cur = null;
+                for (const [start, end] of raw[kind]) {
+                    if (cur && start <= cur.end + BAND_MERGE) cur.end = Math.max(cur.end, end);
+                    else { if (cur) bands.push(cur); cur = { kind, start, end } }
+                }
+                if (cur) bands.push(cur);
+            }
+            return bands.filter(b => b.end - b.start >= MIN_BAND);
+        }
+        function renderHistory() {
+            if (!histData || !histWrap.clientWidth) return true;
+            const { from, to, samples } = histData, span = to - from, W = histWrap.clientWidth, H = 240, L = 34, R = 8, T = 22, B = 22;
+            let min = Infinity, max = -Infinity;
+            for (const s of samples) for (const v of [s.top, s.bottom]) if (Number.isFinite(v)) { if (v < min) min = v; if (v > max) max = v }
+            if (min === Infinity) { histChart.innerHTML = ''; return false }
+            const lo = Math.floor((min - 2) / 10) * 10, hi = Math.ceil((max + 2) / 10) * 10, yStep = hi - lo > 30 ? 10 : 5;
+            const x = t => L + (t - from) / span * (W - L - R), y = v => T + (hi - v) / (hi - lo) * (H - T - B), f = n => n.toFixed(1);
+            const txt = (tx, ty, s, anchor = 'middle', extra = '') => `<text x="${tx}" y="${ty}" text-anchor="${anchor}" ${extra}>${s}</text>`;
+            const bucket = Math.max(60, Math.ceil(span / MAX_POINTS / 60) * 60), buckets = new Map();
+            for (const s of samples) {
+                const k = Math.floor((s.t - from) / bucket);
+                let b = buckets.get(k);
+                if (!b) buckets.set(k, b = { top: 0, nt: 0, bottom: 0, nb: 0 });
+                if (Number.isFinite(s.top)) { b.top += s.top; b.nt++ }
+                if (Number.isFinite(s.bottom)) { b.bottom += s.bottom; b.nb++ }
+            }
+            const points = [...buckets].sort((a, b) => a[0] - b[0]).map(([k, b]) => ({ t: Math.min(to, from + (k + .5) * bucket), top: b.nt ? b.top / b.nt : NaN, bottom: b.nb ? b.bottom / b.nb : NaN }));
+            let grid = '', labels = txt(2, 12, '°C', 'start'), bandSvg = '', areas = '', strokes = '';
+            for (let v = lo; v <= hi; v += yStep) { grid += `<path d="M${L} ${f(y(v))}H${W - R}"/>`; labels += txt(L - 6, f(y(v) + 4), v, 'end') }
+            const ticks = [], d = new Date(from * 1000);
+            d.setHours(0, 0, 0, 0);
+            if (span <= 86400) {
+                const step = span <= 3600 ? 900 : span <= 21600 ? 3600 : 21600, mid = d.getTime() / 1000;
+                for (let t = mid + Math.ceil((from - mid) / step) * step; t <= to; t += step) ticks.push([t, new Date(t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })]);
+            } else {
+                const every = span <= 604800 ? 1 : 7, fmt = every === 1 ? { weekday: 'short' } : { day: 'numeric', month: 'numeric' };
+                for (d.setDate(d.getDate() + 1); d.getTime() / 1000 <= to; d.setDate(d.getDate() + every)) ticks.push([d.getTime() / 1000, d.toLocaleDateString([], fmt)]);
+            }
+            for (const [t, s] of ticks) {
+                const tx = x(t);
+                grid += `<path d="M${f(tx)} ${T}V${H - B}"/>`;
+                if (tx - L >= 18 && W - R - tx >= 18) labels += txt(f(tx), H - 6, s);
+            }
+            let labelEnd = -Infinity;
+            for (const b of detectBands(samples).sort((p, q) => p.start - q.start)) {
+                const x0 = x(Math.max(b.start, from)), x1 = x(Math.min(b.end, to)), heat = b.kind === 'heat', name = heat ? 'Heating' : 'Shower';
+                bandSvg += `<rect x="${f(x0)}" y="${T}" width="${f(x1 - x0)}" height="${H - T - B}" fill="${heat ? '#16a36a' : '#f59e4b'}" fill-opacity="${heat ? .14 : .2}"/>`;
+                const half = name.length * 3.4, cx = Math.min(Math.max((x0 + x1) / 2, L + half), W - R - half);
+                if (x1 - x0 < MIN_LABEL_PX || cx - half < labelEnd + 4) continue;
+                labels += txt(f(cx), 14, name, 'middle', `fill="${heat ? '#12844f' : '#d0701c'}" font-weight="600"`);
+                labelEnd = cx + half;
+            }
+            for (const [key, color] of [['top', '#e72f2c'], ['bottom', '#1267df']]) {
+                const runs = [];
+                let run = [], prev = null;
+                for (const p of points) {
+                    if (!Number.isFinite(p[key]) || (prev && p.t - prev.t > 3 * bucket)) { if (run.length) runs.push(run); run = [] }
+                    if (Number.isFinite(p[key])) run.push([f(x(p.t)), f(y(p[key]))]);
+                    prev = p;
+                }
+                if (run.length) runs.push(run);
+                for (const r of runs) {
+                    if (r.length === 1) r.push(r[0]);
+                    const line = 'M' + r.map(q => q.join(' ')).join('L');
+                    areas += `<path d="${line}L${r[r.length - 1][0]} ${H - B}L${r[0][0]} ${H - B}Z" fill="url(#hg-${key})"/>`;
+                    strokes += `<path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+                }
+            }
+            const grad = (id, c) => `<linearGradient id="${id}" x2="0" y2="1"><stop stop-color="${c}" stop-opacity=".18"/><stop offset="1" stop-color="${c}" stop-opacity=".02"/></linearGradient>`;
+            histChart.setAttribute('viewBox', `0 0 ${W} ${H}`);
+            histChart.innerHTML = `<defs>${grad('hg-top', '#e72f2c')}${grad('hg-bottom', '#1267df')}</defs>${bandSvg}<g stroke="#e8eef2">${grid}</g>${areas}${strokes}<g font-size="11" fill="#63778a">${labels}</g>`;
+            return true;
+        }
+        for (const b of rangeBtns) b.addEventListener('click', () => { histRange = +b.dataset.range; for (const o of rangeBtns) o.classList.toggle('active', o === b); loadHistory() });
+        window.addEventListener('resize', () => renderHistory());
+        setInterval(() => { if (!$('view-history').hidden) loadHistory() }, 60000);
         function showTab(name) {
             for (const b of tabs) { const on = b.dataset.view === name; b.classList.toggle('active', on); b.setAttribute('aria-selected', on) }
-            $('view-tank').hidden = name !== 'tank'; $('view-logs').hidden = name !== 'logs';
+            $('view-tank').hidden = name !== 'tank'; $('view-history').hidden = name !== 'history'; $('view-logs').hidden = name !== 'logs';
             history.replaceState(null, '', '#' + name);
             if (name === 'logs') loadLogs();
+            if (name === 'history') loadHistory();
         }
         for (const b of tabs) b.addEventListener('click', () => showTab(b.dataset.view));
         logRefresh.addEventListener('click', loadLogs);
-        showTab(location.hash === '#logs' ? 'logs' : 'tank');
+        showTab(['logs', 'history'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'tank');
     </script>
 </body>
 
