@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
     <meta name="theme-color" content="#172b41">
     <title>Hot Water Monitor</title>
     <style>
@@ -18,7 +18,87 @@
         }
 
         body {
-            margin: 0
+            margin: 0;
+            padding-bottom: calc(64px + env(safe-area-inset-bottom))
+        }
+
+        .view[hidden] {
+            display: none
+        }
+
+        .tabs {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            justify-content: center;
+            background: #172b41;
+            box-shadow: 0 -2px 8px #14273a35;
+            padding-bottom: env(safe-area-inset-bottom);
+            z-index: 10
+        }
+
+        .tabs button {
+            flex: 1;
+            max-width: 460px;
+            min-height: 56px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            background: none;
+            border: 0;
+            color: #9fb3c6;
+            font: 600 .8rem system-ui, -apple-system, "Segoe UI", sans-serif;
+            cursor: pointer
+        }
+
+        .tabs button svg {
+            width: 22px;
+            height: 22px
+        }
+
+        .tabs button.active {
+            color: #58a9f2
+        }
+
+        .log-tools {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            color: #52677b;
+            font-size: .9rem;
+            margin-bottom: 12px
+        }
+
+        .log-tools button {
+            border: 1px solid #c9d8e3;
+            background: #fff;
+            color: #20364d;
+            border-radius: 10px;
+            padding: 8px 14px;
+            font: inherit;
+            cursor: pointer
+        }
+
+        .log-tools button:disabled {
+            opacity: .5
+        }
+
+        #log-box {
+            margin: 0;
+            font: .78rem/1.45 ui-monospace, Consolas, monospace;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            height: calc(100dvh - 260px);
+            min-height: 240px;
+            overflow: auto;
+            background: #f6f9fb;
+            border-radius: 12px;
+            padding: 12px
         }
 
         .bar {
@@ -154,6 +234,7 @@
         <h1>Hot Water Monitor</h1>
     </header>
     <main class="wrap">
+        <div id="view-tank" class="view">
         <section class="card" aria-labelledby="tank-title">
             <h2 id="tank-title">Tank</h2>
             <div class="status" role="status" aria-live="polite"><span class="dot" id="dot"></span><span
@@ -208,13 +289,54 @@
             </svg>
             <div class="foot"><span id="last">No reading received yet</span></div>
         </section>
+        </div>
+        <div id="view-logs" class="view" hidden>
+            <section class="card" aria-labelledby="logs-title">
+                <h2 id="logs-title">Logs</h2>
+                <div class="log-tools"><span id="log-state" role="status" aria-live="polite">Not loaded</span><button
+                        type="button" id="log-refresh">Refresh</button></div>
+                <pre id="log-box"></pre>
+            </section>
+        </div>
     </main>
+    <nav class="tabs" role="tablist">
+        <button type="button" role="tab" data-view="tank"><svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 2C9 7 5 11 5 15a7 7 0 0 0 14 0c0-4-4-8-7-13Z" fill="currentColor" />
+            </svg>Tank</button>
+        <button type="button" role="tab" data-view="logs"><svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 6h16M4 12h16M4 18h10" fill="none" stroke="currentColor" stroke-width="2.4"
+                    stroke-linecap="round" />
+            </svg>Logs</button>
+    </nav>
     <script>
         'use strict';
         const $ = id => document.getElementById(id), state = $('state'), dot = $('dot'), topOut = $('top-temp'), bottomOut = $('bottom-temp'), last = $('last');
         async function refresh() { try { const r = await fetch('/api/temp', { cache: 'no-store', signal: AbortSignal.timeout(5000) }); if (!r.ok) throw Error('HTTP ' + r.status); const d = await r.json(); if (!Number.isFinite(d.tempTop) || !Number.isFinite(d.tempBottom)) throw Error('Unexpected response'); bottomOut.textContent = d.tempBottom.toFixed(1) + '°C'; topOut.textContent = d.tempTop.toFixed(1) + '°C'; dot.className = 'dot ok'; state.textContent = 'ESP32 reachable'; last.dataset.when = new Date().toLocaleTimeString(); last.textContent = 'Last reading: ' + last.dataset.when } catch (e) { dot.className = 'dot bad'; state.textContent = e.message === 'Unexpected response' ? 'Invalid sensor data' : 'ESP32 unreachable · waiting to reconnect'; last.textContent = 'Last successful reading: ' + (last.dataset.when || 'none yet') } }
         refresh(); setInterval(refresh, 10000);
+        const tabs = document.querySelectorAll('.tabs button'), logBox = $('log-box'), logState = $('log-state'), logRefresh = $('log-refresh');
+        async function fetchLog(url) { const r = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(5000) }); if (r.status === 404) return ''; if (!r.ok) throw Error('HTTP ' + r.status); return r.text() }
+        async function loadLogs() {
+            if (logRefresh.disabled) return;
+            logRefresh.disabled = true; logState.textContent = 'Loading…';
+            try {
+                const [old, cur] = await Promise.all([fetchLog('/api/log?old=1'), fetchLog('/api/log')]);
+                logBox.textContent = (old + cur) || 'No log entries yet';
+                logBox.scrollTop = logBox.scrollHeight;
+                logState.textContent = 'Updated ' + new Date().toLocaleTimeString();
+            } catch (e) { logState.textContent = 'Could not load logs' }
+            finally { logRefresh.disabled = false }
+        }
+        function showTab(name) {
+            for (const b of tabs) { const on = b.dataset.view === name; b.classList.toggle('active', on); b.setAttribute('aria-selected', on) }
+            $('view-tank').hidden = name !== 'tank'; $('view-logs').hidden = name !== 'logs';
+            history.replaceState(null, '', '#' + name);
+            if (name === 'logs') loadLogs();
+        }
+        for (const b of tabs) b.addEventListener('click', () => showTab(b.dataset.view));
+        logRefresh.addEventListener('click', loadLogs);
+        showTab(location.hash === '#logs' ? 'logs' : 'tank');
     </script>
 </body>
+
 
 </html>
