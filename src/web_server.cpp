@@ -3,11 +3,17 @@
 #include <WebServer.h>
 #include <SPIFFS.h>
 #include <ArduinoJson.h>
+#include "logger.h"
 #include "temperature_sensors.h"
 
 static WebServer server(80);
 
 static void handleRoot() {
+  // SPIFFS.open() returns a valid empty directory handle for missing paths, so check exists() first.
+  if (!SPIFFS.exists("/index.html")) {
+    server.send(404, "text/plain", "index.html not found");
+    return;
+  }
   File file = SPIFFS.open("/index.html", "r");
   if (!file) {
     server.send(404, "text/plain", "index.html not found");
@@ -40,10 +46,21 @@ static void handleTemperature() {
   server.send(200, "application/json", content);
 }
 
+static void handleLog() {
+  File file = logOpen(server.hasArg("old"));
+  if (!file) {
+    server.send(404, "text/plain", "log not found");
+    return;
+  }
+  server.streamFile(file, "text/plain");
+  file.close();
+}
+
 void webServerSetup() {
   server.on("/", HTTP_GET, handleRoot);
   server.on("/api/status", HTTP_GET, handleStatus);
   server.on("/api/temp", HTTP_GET, handleTemperature);
+  server.on("/api/log", HTTP_GET, handleLog);
   server.begin();
 }
 

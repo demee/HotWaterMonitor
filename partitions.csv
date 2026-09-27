@@ -2,4 +2,5 @@
 nvs,      data, nvs,     0x9000,   0x6000,
 phy_init, data, phy,     0xF000,   0x1000,
 app,      app,  factory, 0x10000,  0x200000,
-spiffs,   data, spiffs,  0x210000, 0x1F0000,
+logs,     data, spiffs,  0x210000, 0x60000,
+spiffs,   data, spiffs,  0x270000, 0x190000,

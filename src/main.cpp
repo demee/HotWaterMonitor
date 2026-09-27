@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include "logger.h"
 #include "spiffs_storage.h"
 #include "temperature_sensors.h"
 #include "web_server.h"
@@ -7,6 +8,7 @@
 void setup() {
   Serial.begin(115200);
   delay(1000);
+  logSetup();
   wifiSetup();
   storageSetup();
   webServerSetup();
