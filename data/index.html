@@ -420,6 +420,8 @@
             finally { logRefresh.disabled = false }
         }
         const TREND_WINDOW = 900, TREND_MIN_SPAN = 600, HEAT_RISE = 0.8, SHOWER_DROP = 1.5, BAND_MERGE = 600, MIN_BAND = 600, MAX_POINTS = 300, MIN_LABEL_PX = 8;
+        // Day files are named in the ESP32's time zone, which may differ from the browser's by up to this many seconds.
+        const DAY_SLACK = 43200;
         const histState = $('hist-state'), histWrap = $('hist-wrap'), histChart = $('hist-chart'), rangeBtns = document.querySelectorAll('.seg button'), dayCache = new Map();
         let histRange = 86400, histData = null, histLoading = false;
         const pad2 = n => String(n).padStart(2, '0'), dayKey = d => d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate());
@@ -431,7 +433,7 @@
                 const v = new DataView(await r.arrayBuffer()), dec = x => x === -32768 ? NaN : x / 100;
                 for (let o = 0; o + 8 <= v.byteLength; o += 8) out.push({ t: v.getUint32(o, true), top: dec(v.getInt16(o + 4, true)), bottom: dec(v.getInt16(o + 6, true)) });
             }
-            if (key !== dayKey(new Date())) dayCache.set(key, out);
+            if (key < dayKey(new Date(Date.now() - DAY_SLACK * 1000))) dayCache.set(key, out);
             return out;
         }
         async function loadHistory() {
@@ -440,9 +442,9 @@
             const range = histRange;
             for (const b of rangeBtns) b.classList.toggle('active', +b.dataset.range === range);
             try {
-                const to = Math.floor(Date.now() / 1000), from = to - range, keys = [], samples = [], d = new Date(from * 1000);
+                const to = Math.floor(Date.now() / 1000), from = to - range, keys = [], samples = [], d = new Date((from - DAY_SLACK) * 1000);
                 d.setHours(0, 0, 0, 0);
-                while (d.getTime() / 1000 <= to) { keys.push(dayKey(d)); d.setDate(d.getDate() + 1) }
+                while (d.getTime() / 1000 <= to + DAY_SLACK) { keys.push(dayKey(d)); d.setDate(d.getDate() + 1) }
                 for (const [i, key] of keys.entries()) {
                     histState.textContent = `Loading… (${i + 1}/${keys.length})`;
                     for (const s of await fetchDay(key)) if (s.t >= from && s.t <= to) samples.push(s);
