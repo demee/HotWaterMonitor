@@ -29,12 +29,13 @@ $env:USERPROFILE\.platformio\penv\Scripts\platformio.exe run --environment esp32
 
 ## Modules
 
-- `src/main.cpp` — wiring only. `setup()`: `logSetup`, `wifiSetup`, `storageSetup`, `webServerSetup`, `temperatureSensorsSetup`, `historySetup`. `loop()`: `wifiLoop`, `webServerLoop`, `historyLoop`, `delay(10)`.
+- `src/main.cpp` — wiring only. `setup()`: `logSetup`, `wifiSetup`, `storageSetup`, `webServerSetup`, `temperatureSensorsSetup`, `historySetup`, `lcdDisplaySetup`. `loop()`: `wifiLoop`, `webServerLoop`, `historyLoop`, `lcdDisplayLoop`, `delay(10)`.
 - `src/logger.*` — `logPrintf()` writes to Serial and `/log.txt` on the `logs` partition (mutex-protected). Rotates to `/log.old.txt` at 100 KB. Timestamps are `+sec.ms` uptime until the clock passes `MIN_VALID_EPOCH` (2024-01-01, i.e. NTP synced). Sets `TZ` at boot.
 - `src/wifi_connection.*` — connect, event logging, NTP start (`configTzTime`). Sleep disabled. Checks every 10 s, reconnects every 30 s while down, `ESP.restart()` after 5 min offline (`WIFI_*_MS` constants).
 - `src/spiffs_storage.*` — mounts the `spiffs` partition at `/spiffs` (holds `index.html`).
 - `src/temperature_sensors.*` — `readTankTemperatures()` → `TankTemperatures{bottom, top}`.
 - `src/temperature_history.*` — per-local-day files `/YYYYMMDD.bin` on the `history` partition. Appends one record per wall-clock minute, only after NTP sync. Prunes files older than 31 days when a new day file is created.
+- `src/lcd_display.*` — 1602 LCD with PCF8574 I2C backpack, SDA `GPIO5`, SCL `GPIO6`. At boot scans the bus, logs every device, and uses the first address in `0x20-0x27`/`0x38-0x3F`; display disabled if none. Refreshes every 5 s: row 0 top, row 1 bottom; `--.-` for a disconnected sensor. `Wire.begin(SDA, SCL)` must run before `lcd.init()` (the library calls `Wire.begin()` with default pins).
 - `src/web_server.*` — HTTP routes (below).
 - `src/shower_detector.cpp` — fully commented-out analog draft on `GPIO3`; not compiled.
 

@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include "lcd_display.h"
 #include "logger.h"
 #include "spiffs_storage.h"
 #include "temperature_history.h"
@@ -15,11 +16,13 @@ void setup() {
   webServerSetup();
   temperatureSensorsSetup();
   historySetup();
+  lcdDisplaySetup();
 }
 
 void loop() {
   wifiLoop();
   webServerLoop();
   historyLoop();
+  lcdDisplayLoop();
   delay(10);
 }
