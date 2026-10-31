@@ -1,5 +1,13 @@
 # WaterMonitor
 
+## Gallery 
+
+<img width="1003" height="739" alt="image" src="https://github.com/user-attachments/assets/cd60f94e-d159-4458-9774-2e705d8fb6c2" />
+<img width="1469" height="1958" alt="image" src="https://github.com/user-attachments/assets/fe0b9d3f-166b-4cd7-8e4a-c72f32d55bf3" />
+<img width="900" height="1958" alt="image" src="https://github.com/user-attachments/assets/a24615ed-0947-4bc7-b860-3e21b90f38d4" />
+<img width="900" height="1958" alt="image" src="https://github.com/user-attachments/assets/40603475-f00c-4599-aca2-adce45f442fa" />
+
+
 ## Overview
 WaterMonitor is an ESP32-C3 firmware + static web UI project for reading two DS18B20 sensors and exposing temperatures over HTTP.
 The firmware publishes JSON endpoints, and the browser UI visualizes top and bottom tank readings.
